@@ -5,8 +5,6 @@
 
 import asyncio
 
-import tornado
-
 import os
 
 import socket
@@ -15,8 +13,6 @@ import random
 
 import requests
 
-import json
-
 import tornado.web
 
 import tornado.ioloop
@@ -24,11 +20,9 @@ import tornado.ioloop
 from kubernetes import client, config
 
 
-
-
 Pod_Ip = str(os.environ['Pod_Ip'])
 
-Web_Port = int(os.environ['Web_Port', 8181])
+Web_Port = int(os.environ['Web_Port', 8000])
 
 Pod_Id = random.randint(0, 100)
 
