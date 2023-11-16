@@ -3,10 +3,10 @@ kind: Service
 metadata:
   name: Services
 spec:
-  type: NodePort
+  clusterIP: None
   selector: 
     app: kuber
   ports: 
     - protocol: TCP
-      port: 8080
-      targetPort: 8080
+      port: 8181
+      targetPort: 8181

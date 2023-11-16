@@ -26,9 +26,9 @@ from kubernetes import client, config
 
 
 
-Pod_Ip = str(os.environ('Pod_Ip'))
+Pod_Ip = str(os.environ['Pod_Ip'])
 
-Web_Port = int(os.environ('Web_Port'))
+Web_Port = int(os.environ['Web_Port', 8181])
 
 Pod_Id = random.randint(0, 100)
 
@@ -107,6 +107,7 @@ async def run_bully():
 async def pod_id(requests):
     pod_id_data = {"Pod_Id": Pod_Id}  
     requests.write(pod_id_data)
+
 
 
 async def send_election_msg():
@@ -204,5 +205,7 @@ if __name__ == "__main__":
         ('/receive_answer', receive_answer),
         ('/receive_coordinator', receive_coordinator)
     ])
+    print("server starting")
     app.cleanup_ctx.append(background_tasks)
     tornado.web.run_app(app, host = '0.0.0.0', port = Web_Port)
+
