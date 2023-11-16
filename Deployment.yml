@@ -18,4 +18,4 @@ spec:
       - name: kuber
         image: 202106601/kuber
         ports:
-        - containerPort: 8181
+        - containerPort: 8000

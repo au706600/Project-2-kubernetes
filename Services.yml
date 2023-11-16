@@ -8,5 +8,5 @@ spec:
     app: kuber
   ports: 
     - protocol: TCP
-      port: 8181
-      targetPort: 8181
+      port: 8000
+      targetPort: 8000
