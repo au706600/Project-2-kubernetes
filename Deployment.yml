@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kubia-deployment
+  name: Deployment
   labels:
-    app: kubia # dockerhub
+    app: kuber # dockerhub
 spec:
   replicas: 5
   selector:
     matchLabels:
-      app: kubia
+      app: kuber
   template:
     metadata:
       labels:
-        app: kubia
+        app: kuber
     spec:
       containers:
-      - name: kubia
-        image: 202106601/kubia
+      - name: kuber
+        image: 202106601/kuber
         ports:
         - containerPort: 8080
