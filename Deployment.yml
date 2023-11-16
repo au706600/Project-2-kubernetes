@@ -3,19 +3,19 @@ kind: Deployment
 metadata:
   name: Deployment
   labels:
-    app: kuber # dockerhub
+    app: Kubernetes # dockerhub
 spec:
   replicas: 5
   selector:
     matchLabels:
-      app: kuber
+      app: Kubernetes
   template:
     metadata:
       labels:
-        app: kuber
+        app: Kubernetes
     spec:
       containers:
-      - name: kuber
-        image: 202106601/kuber
+      - name: Kubernetes
+        image: 202106601/Kubernetes
         ports:
         - containerPort: 8000
