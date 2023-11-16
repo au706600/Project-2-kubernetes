@@ -21,6 +21,10 @@ import tornado.web
 
 import tornado.ioloop
 
+from kubernetes import client, config
+
+
+
 
 Pod_Ip = str(os.environ('Pod_Ip'))
 
@@ -30,12 +34,22 @@ Pod_Id = random.randint(0, 100)
 
 leader_pod_id = -1
 
+max_pod_id = -1
+
 higher_id = []
 
 
+#https://github.com/kubernetes-client/python
 # If you need to do setup of Kubernetes, i.e. if using Kubernetes Python client
 async def setup_k8s():
-    print("K8S setup completed")
+    #print("K8S setup completed")
+    config.load_kube_config()
+    v1 = client.CoreV1Api()
+    print("Listing all pods with their IPs: ")
+    ret = v1.list_pod_for_all_namespaces(watch = False)
+
+    for i in ret.items: 
+        print("%s\t%s\t%s" % (i.status.pod_ip, i.metadata.namespace, i.metadata.name))
 
 
 async def run_bully():
@@ -97,6 +111,7 @@ async def pod_id(requests):
 
 async def send_election_msg():
     global ip_list
+    global max_pod_id
     for pod_ip in ip_list:
         if pod_id > max_pod_id:
             higher_id.append(pod_id)
@@ -105,6 +120,10 @@ async def send_election_msg():
             data = {"sender_pod_id": Pod_Id}
             requests.post(url, json = data)
             print(f"Sent election from Pod {Pod_Id} to {pod_ip}")
+    
+    if not higher_id:
+        coordinator_Pod_Id = data.get("coordinator_pod_id")
+        await send_coordinator_msg(coordinator_Pod_Id)
 
 
 async def send_ok_msg(sender_pod_id):
@@ -159,11 +178,12 @@ async def receive_answer(requests):
 
 # POST /receive_coordinator
 async def receive_coordinator(requests):
+    global leader_pod_id
     data = await requests.json()
     coordinator_Pod_Id = data.get("coordinator_pod_id")
+    leader_pod_id = coordinator_Pod_Id
     print(f"Received coordination message from Pod {coordinator_Pod_Id}")
 
-    leader_pod_id = leader_pod_id
 
 async def background_tasks():
     task = asyncio.create_task(run_bully())
@@ -179,7 +199,7 @@ if __name__ == "__main__":
         ('/pod_id', pod_id),
         ('/send_election_msg', send_election_msg),
         ('/send_ok', send_ok_msg),
-        ('/send_coordinator_msg', send_coordinator_msg)
+        ('/send_coordinator_msg', send_coordinator_msg),
         ('/receive_election', receive_election),
         ('/receive_answer', receive_answer),
         ('/receive_coordinator', receive_coordinator)
