@@ -5,7 +5,7 @@ metadata:
 spec:
   clusterIP: None
   selector: 
-    app: Kubernetes
+    app: kubernetes
   ports: 
     - protocol: TCP
       port: 8000
