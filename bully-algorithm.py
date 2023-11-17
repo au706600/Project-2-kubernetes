@@ -22,15 +22,15 @@ import tornado.ioloop
 from kubernetes import client, config
 
 
-Pod_Ip = str(os.environ['Pod_Ip'])
+#Pod_Ip = str(os.environ['Pod_Ip'])
 
-Web_Port = int(os.environ['Web_Port', 8000])
+Pod_Ip = os.environ.get('Pod_Ip', 'localhost')
+
+Web_Port = int(os.environ['Web_Port'])
 
 Pod_Id = random.randint(0, 100)
 
 leader_pod_id = -1
-
-max_pod_id = -1
 
 higher_id = []
 
@@ -77,13 +77,13 @@ async def run_bully():
 
         other_pods = dict()
 
-        for pod_ip in ip_list:
+        for POD_IP in ip_list:
             endpoint = '/pod_id'
-            url = 'http://' + str(pod_ip) + ':' + str(Web_Port) + endpoint
+            url = 'http://' + str(POD_IP) + ':' + str(Web_Port) + endpoint
 
             response = requests.get(url)
 
-            other_pods[str(pod_ip)] = response.json()
+            other_pods[str(POD_IP)] = response.json()
         
         print(other_pods)
 
@@ -103,26 +103,26 @@ async def run_bully():
 
 # GET /pod_id
 async def pod_id(request):
+    global Pod_Id
     pod_id_data = {"Pod_Id": Pod_Id}  
     request.write(json.dumps(pod_id_data))
     request.set_header("Hello", "application/json")
     await request.finish()
 
 async def send_election_msg():
-    global ip_list
-    global max_pod_id
-    for pod_ip in ip_list:
+    global ip_list, max_pod_id, Pod_Id, Web_Port
+    for POD_IP in ip_list.items():
         if Pod_Id > max_pod_id:
-            higher_id.append(pod_id)
+            higher_id.append(Pod_Id)
             endpoint = '/receive election'
-            url = 'http://' + str(pod_ip) + ':' + str(Web_Port) + endpoint
+            url = 'http://' + str(POD_IP) + ':' + str(Web_Port) + endpoint
             data = {"sender_pod_id": Pod_Id}
             requests.post(url, json = data)
-            print(f"Sent election from Pod {Pod_Id} to {pod_ip}")
+            print(f"Sent election from Pod {Pod_Id} to {Pod_Ip}")
     
-    if not higher_id:
-        coordinator_Pod_Id = data.get("coordinator_pod_id")
-        await send_coordinator_msg(coordinator_Pod_Id)
+        else:
+            coordinator_Pod_Id = data.get("coordinator_pod_id")
+            await send_coordinator_msg(coordinator_Pod_Id)
 
 
 async def send_ok_msg(sender_pod_id):
@@ -144,12 +144,12 @@ async def send_coordinator_msg(coordinator_Pod_Id):
         print(f"Sent coordinator msg from Pod {Pod_Id} to {coordinator_Pod_Id}")
 
         # For lower processes, send the coordinator msg
-    if pod_id < max_pod_id:
+    if Pod_Id < max_pod_id:
         endpoint = '/receive coordinator msg'
-        url = 'http://' + str(pod_ip) + ':' + str(Web_Port) + endpoint
+        url = 'http://' + str(Pod_Ip) + ':' + str(Web_Port) + endpoint
         data = {"Pod_Id": Pod_Id}
         requests.post(url, json = data)
-        print(f"Sent election from Pod {Pod_Id} to {pod_ip}")
+        print(f"Sent election from Pod {Pod_Id} to {Pod_Ip}")
     
 
 # POST /receive_election - election message
