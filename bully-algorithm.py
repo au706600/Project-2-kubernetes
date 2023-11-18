@@ -26,7 +26,7 @@ from kubernetes import client, config
 
 Pod_Ip = os.environ.get('Pod_Ip', 'localhost')
 
-Web_Port = int(os.environ['Web_Port'])
+Web_Port = int(os.environ.get('Web_Port', 8000))
 
 Pod_Id = random.randint(0, 100)
 
@@ -191,10 +191,9 @@ async def background_tasks():
     await task
 
 
-
 if __name__ == "__main__":
     app = tornado.web.Application()
-    app.add_handlers([
+    app.add_handlers('.*',[  
         ('/pod_id', pod_id),
         ('/send_election_msg', send_election_msg),
         ('/send_ok', send_ok_msg),
@@ -204,6 +203,8 @@ if __name__ == "__main__":
         ('/receive_coordinator', receive_coordinator)
     ])
     print("server starting")
-    app.cleanup_ctx.append(background_tasks)
-    tornado.web.run_app(app, host = '0.0.0.0', port = Web_Port)
+    tornado.ioloop.IOLoop.current().spawn_callback(background_tasks)
+    app.listen(port = Web_Port, host = '0.0.0.0')
+    #tornado.web.run_app(app, host = '0.0.0.0', port = Web_Port)
+    tornado.ioloop.IOLoop.current().start()
 
