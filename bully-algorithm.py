@@ -237,7 +237,7 @@ if __name__ == "__main__":
         ('/receive_coordinator', receive_coordinator)
     ])
     print("server starting")
-    tornado.ioloop.IOLoop.spawn_callback(background_tasks)
+    tornado.ioloop.IOLoop.current().spawn_callback(background_tasks, '.*')
     app.listen(Web_Port, address='0.0.0.0')
     tornado.ioloop.IOLoop.current().start()
 
