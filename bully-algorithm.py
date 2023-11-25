@@ -112,7 +112,7 @@ async def run_bully():
         # If P_k notices a non-responding coordinator, it initiates election. 
        # max_pod_id = max([pod_data['Pod_Id'] for pod_data in other_pods.values()], default=-1)
 
-        if coordinator_pod_id == None or not check_alive(Ip):
+        if coordinator_pod_id == None or not check_alive(Pod_Ip):
             print("Initiating election")
             start_election()
         
@@ -131,9 +131,9 @@ async def start_election(other_pods):
         requests.post(url, json = send_data)
         print(f"Sent election from Pod{Pod_Id} to {Ip}")
 
-async def check_alive(Ip):
+async def check_alive():
     #endpoint = '/pod_id'
-    url = f'http://{Ip}:{Web_Port}/pod_id'
+    url = f'http://{Pod_Ip}:{Web_Port}/pod_id'
     try:
         response = requests.get(url)
         return response.status_code == 200
