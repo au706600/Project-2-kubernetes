@@ -48,7 +48,7 @@ Web_Port = int(os.environ.get('Web_Port', 8000))
 
 Pod_Id = random.randint(0, 100)
 
-leader_pod_id = -1
+leader_pod_id = None
 
 coordinator_pod_id = None # null
 
@@ -112,9 +112,9 @@ async def run_bully():
         # If P_k notices a non-responding coordinator, it initiates election. 
        # max_pod_id = max([pod_data['Pod_Id'] for pod_data in other_pods.values()], default=-1)
 
-        if coordinator_pod_id == None or not check_alive(Pod_Ip):
+        if coordinator_pod_id == None or not check_alive(coordinator_pod_id):
             print("Initiating election")
-            start_election()
+            start_election(other_pods)
         
         else:
             print("Not starting election due to lower id")
@@ -133,13 +133,13 @@ async def start_election(other_pods):
 
 async def check_alive():
     #endpoint = '/pod_id'
-    url = f'http://{Pod_Ip}:{Web_Port}/pod_id'
+    url = f'http://{coordinator_pod_id}:{Web_Port}/pod_id'
     try:
         response = requests.get(url)
         return response.status_code == 200
     
     except requests.exceptions.RequestException as e:
-        print("An error occurred: {e}")
+        print(f"An error occurred: {e}")
         return False
 
 # GET /pod_id
