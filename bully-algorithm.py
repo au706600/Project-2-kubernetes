@@ -37,8 +37,6 @@ import tornado.ioloop
 
 from kubernetes import client, config
 
-#from tornado.escape import json_decode
-
 
 #Pod_Ip = str(os.environ['Pod_Ip'])
 
@@ -100,7 +98,7 @@ async def run_bully():
         other_pods = dict()
 
         for pod_ip in ip_list:
-            endpoint = '/pod_id'
+            endpoint = '/pod_id' 
             url = 'http://' + str(pod_ip) + ':' + str(Web_Port) + endpoint
 
             response = requests.get(url)
@@ -109,30 +107,39 @@ async def run_bully():
         
         print(other_pods)
 
-        # If P_k notices a non-responding coordinator, it initiates election. 
-       # max_pod_id = max([pod_data['Pod_Id'] for pod_data in other_pods.values()], default=-1)
-
+        # If P_k notices a non-responding coordinator, it initiates election by calling function
         if coordinator_pod_id == None or not check_alive(coordinator_pod_id):
             print("Initiating election")
             start_election(other_pods)
         
         else:
+            # Else we do not start election due to lower id
             print("Not starting election due to lower id")
+
         
         # Repeat after sleeping
         await asyncio.sleep(2)
 
 async def start_election(other_pods):
     higher_id = [Ip for Ip, Id in other_pods.items() if Id > Pod_Id]
-    
+    print(f"Higher id's: {higher_id}")
+
     for Ip in higher_id:
         url = f"http://{Ip}:{Web_Port}/receive_election"
         send_data = {"sender_Pod_Id": Pod_Id}
         requests.post(url, json = send_data)
         print(f"Sent election from Pod{Pod_Id} to {Ip}")
+    
+    if len(higher_id) == 0:
+        print("No higher id's, starting election")
+        start_election(other_pods)
+
+    else:
+        print("Starting election")
+        send_election_msg(higher_id)
 
 async def check_alive():
-    #endpoint = '/pod_id'
+    
     url = f'http://{coordinator_pod_id}:{Web_Port}/pod_id'
     try:
         response = requests.get(url)
@@ -217,11 +224,11 @@ async def receive_coordinator(request: tornado.web.RequestHandler):
     # After receiving a coordinator message, treat the sender as the coordinator
     leader_pod_id = coordinator_Pod_Id
 
-def roothandler(request: tornado.web.RequestHandler):
-    request.render("Webpage.html", leader_pod_id = leader_pod_id)
+#def roothandler(request: tornado.web.RequestHandler):
+ #   request.render("Webpage.html", leader_pod_id = leader_pod_id)
 
-def mainhandler(request: tornado.web.RequestHandler):
-    request.render("Webpage.html", leader_pod_id = leader_pod_id)
+#def mainhandler(request: tornado.web.RequestHandler):
+ #   request.render("Webpage.html", leader_pod_id = leader_pod_id)
 
 
 async def background_tasks():
@@ -233,9 +240,7 @@ async def background_tasks():
 
 if __name__ == "__main__":
     setup_k8s()
-    app = tornado.web.Application([
-        (r"/", roothandler),
-        (r"/Webpage.html", mainhandler),  
+    app = tornado.web.Application([ 
         (r"/pod_id", pod_id),
         (r"/send_election_msg", send_election_msg),
         (r"/send_ok", send_ok_msg),
