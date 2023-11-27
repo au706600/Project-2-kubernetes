@@ -121,15 +121,21 @@ async def run_bully():
         await asyncio.sleep(2)
 
 async def start_election(other_pods):
+    # a list comprehension variable to list for any higher id's
     higher_id = [Ip for Ip, Id in other_pods.items() if Id > Pod_Id]
+    # print
     print(f"Higher id's: {higher_id}")
 
+    # if there are, send election message to higher id's
     for Ip in higher_id:
         url = f"http://{Ip}:{Web_Port}/receive_election"
         send_data = {"sender_Pod_Id": Pod_Id}
+        # Send election msg by sending a post request to the url. 
         requests.post(url, json = send_data)
         print(f"Sent election from Pod{Pod_Id} to {Ip}")
     
+    # if there are no higher id's
+    # start election
     if len(higher_id) == 0:
         print("No higher id's, starting election")
         start_election(other_pods)
@@ -137,11 +143,13 @@ async def start_election(other_pods):
     else:
         print("Starting election")
         send_election_msg(higher_id)
+        print("Sent election msg")
 
+# Function to check if if a coordinator pod is alive
 async def check_alive():
-    
     url = f'http://{coordinator_pod_id}:{Web_Port}/pod_id'
     try:
+        # Send a get response to the URL. The return value will be a status response. 
         response = requests.get(url)
         return response.status_code == 200
     
@@ -150,27 +158,35 @@ async def check_alive():
         return False
 
 # GET /pod_id
+# Function to get pod id
 async def pod_id(request: tornado.web.RequestHandler):
+    # write the json encoded Pod_Id to the response body of the request handler. 
     request.write(json.dumps({Pod_Id}))
+    # add header to the response
     request.set_header("Hello", "json")
+    # finish the response
     await request.finish()
 
-# Function to send election message
+# Function to send election message 
 async def send_election_msg(other_pods):
-    # list comprehension
+    # list comprehension variable to list for any higher id's
     higher_id = [Ip for Ip, Id in other_pods.items() if Id > Pod_Id]
+    # In this for loop, we send message to higher id's. 
     for Ip in higher_id:
         #Pod_Id = Id["id"]
         #endpoint = '/receive election'
         url = f'http://{Ip}:{Web_Port}/receive_election'
         send_data = {"sender_Pod_Id": Pod_Id}
+        # HTTP post request to the url with json data format. 
         requests.post(url, json = send_data)
+        # print
         print(f"Sent election from Pod {Pod_Id} to {Ip}")
     
 
 # Function to send ok message
 async def send_ok_msg(sender_pod_id):
     #endpoint = '/receive ok msg'
+    # Send ok message by POST request. 
     url = f'http://{sender_pod_id}:{Web_Port}/receive_answer'
     status = {"sender_Pod_Id": 'OK'}
     send = requests.post(url, json = status)
@@ -180,10 +196,12 @@ async def send_ok_msg(sender_pod_id):
 
 # Function to send coordinator message
 async def send_coordinator_msg(other_pods):
-    # list comprehension
+    # list comprehension variable to list for any lower id's
     lower_id = [Ip for Ip, Id in other_pods.items() if Id < Pod_Id]
+    # In this for loop, we send message to lower id's.
     for Ip in lower_id:
         #endpoint = '/receive coordinator'
+        # Send coordinator message by POST request.
         url = f'http://{Ip}:{Web_Port}/receive_coordinator'
         data = {"coordinator_Pod_Id": Pod_Id}
         requests.post(url, json = data)
@@ -196,22 +214,29 @@ async def send_coordinator_msg(other_pods):
 # with highest Id. 
 async def receive_election(request: tornado.web.RequestHandler):
     # parse json
+    # get sender_Pod_Id and coordinator_Pod_Id by sending GET request. 
     sender_Pod_Id = int(request.get("sender_Pod_Id"))
     coordinator_Pod_Id = int(request.get("coordinator_Pod_Id"))
     print(f"Received election message from {sender_Pod_Id}")
 
+    # if sender_Pod_Id is higher than Pod_Id, send coordinator message
     if Pod_Id > sender_Pod_Id: 
         await send_coordinator_msg(coordinator_Pod_Id)
+    # else send ok message
     else:
         await send_ok_msg(sender_Pod_Id)
 
 # POST /receive_answer - OK message
 async def receive_answer(request: tornado.web.RequestHandler):
+    # parse json
+    # get by sending GET request.
     status = int(request.get("sender_Pod_Id"))
 
+    # if status is OK, print
     if status == "OK":
         print("Received OK message")
     
+    # else print new coordinator
     else:
         coordinator_pod_id = request.get("coordinator_Pod_Id")
         print(f"Received coordinator message, and the new coordinator is: {coordinator_pod_id}")
@@ -219,7 +244,9 @@ async def receive_answer(request: tornado.web.RequestHandler):
 # POST /receive_coordinator - Coordinator message
 async def receive_coordinator(request: tornado.web.RequestHandler):
     global leader_pod_id
+    # parse json
     coordinator_Pod_Id = int(request.get("coordinator_Pod_Id"))
+    # print
     print(f"Received coordination message from Pod {coordinator_Pod_Id}")
     # After receiving a coordinator message, treat the sender as the coordinator
     leader_pod_id = coordinator_Pod_Id
@@ -230,7 +257,7 @@ async def receive_coordinator(request: tornado.web.RequestHandler):
 #def mainhandler(request: tornado.web.RequestHandler):
  #   request.render("Webpage.html", leader_pod_id = leader_pod_id)
 
-
+# Function to run bully algorithm
 async def background_tasks():
     task = asyncio.create_task(run_bully())
     yield
@@ -239,7 +266,10 @@ async def background_tasks():
 
 
 if __name__ == "__main__":
+    # setup for kubernetes python client 
     setup_k8s()
+    # Create a new tornado application with different HTTP handlers
+    # by calling functions. 
     app = tornado.web.Application([ 
         (r"/pod_id", pod_id),
         (r"/send_election_msg", send_election_msg),
@@ -250,9 +280,14 @@ if __name__ == "__main__":
         (r"/receive_coordinator", receive_coordinator)
     ], debug = True, autoreload = False)
 
+    # print server starting as an indicator that the server is starting. 
     print("server starting")
+    # The tornado.ioloop.IOLoop.current() retrieves the I/O-loop instance. 
+    # Then we use the spawn_callback(background_tasks) to run the background_tasks asynchronously. 
     tornado.ioloop.IOLoop.current().spawn_callback(background_tasks)
+    # Listen on port Web_Port, which is specified in the yml files as 8000 and the address. 
     app.listen(Web_Port, address='0.0.0.0')
+    # Start the I/O loop for handling requests and respond.  
     tornado.ioloop.IOLoop.current().start()
 
 
