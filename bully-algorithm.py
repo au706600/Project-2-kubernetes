@@ -138,7 +138,10 @@ async def start_election(other_pods):
     # start election
     if len(higher_id) == 0:
         print("No higher id's, starting election")
-        start_election(other_pods)
+        leader_pod_id = Pod_Id
+        print(f"The leader pod id is: {leader_pod_id}")
+        send_coordinator_msg(other_pods)
+
 
     else:
         print("Starting election")
