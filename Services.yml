@@ -5,7 +5,7 @@ metadata:
 spec:
   clusterIP: None
   selector: 
-    app: bully-app
+    app: kubernetes
   ports: 
     - protocol: TCP
       port: 8000
