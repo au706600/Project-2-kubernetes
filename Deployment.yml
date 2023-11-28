@@ -23,19 +23,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kubernetes-deployment
+  name: bully-app
 spec:
   selector:
-    labels:
-      app: kubernetes
+    matchLabels:
+      app: bully-app
   replicas: 5
   template:
     metadata:
-      #name: kubernetes-deployment
+      name: bully-app
       labels:
-        #name: kubernetes-deployment
-        name: kubernetes
-        app: kubernetes
+        name: bully-app
+        app: bully-app
     spec:
       containers:
         - name: kubernetes
