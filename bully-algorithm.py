@@ -67,7 +67,6 @@ async def setup_k8s():
     
     print("Setup completed")
 
-
 async def run_bully():
     while True: 
         print("Running bully")
@@ -107,6 +106,8 @@ async def run_bully():
         
         print(other_pods)
 
+        print(f"current leader pod id: {leader_pod_id}")
+
         # If P_k notices a non-responding coordinator, it initiates election by calling function
         if coordinator_pod_id == None or not check_alive(coordinator_pod_id):
             print("Initiating election")
@@ -121,8 +122,9 @@ async def run_bully():
         await asyncio.sleep(2)
 
 async def start_election(other_pods):
-    # a list comprehension variable to list for any higher id's
+    # a list comprehension variable to get the higher id's
     higher_id = [Ip for Ip, Id in other_pods.items() if Id > Pod_Id]
+
     # print
     print(f"Higher id's: {higher_id}")
 
@@ -253,6 +255,9 @@ async def receive_coordinator(request: tornado.web.RequestHandler):
     print(f"Received coordination message from Pod {coordinator_Pod_Id}")
     # After receiving a coordinator message, treat the sender as the coordinator
     leader_pod_id = coordinator_Pod_Id
+    # send ok message to the sender
+    await send_ok_msg(coordinator_Pod_Id)
+
 
 #def roothandler(request: tornado.web.RequestHandler):
  #   request.render("Webpage.html", leader_pod_id = leader_pod_id)
@@ -261,7 +266,8 @@ async def receive_coordinator(request: tornado.web.RequestHandler):
  #   request.render("Webpage.html", leader_pod_id = leader_pod_id)
 
 # Function to run bully algorithm
-async def background_tasks():
+async def background_tasks(arg1, arg2):
+    print(f"Background tasks started with {arg1} and {arg2}")
     task = asyncio.create_task(run_bully())
     yield
     task.cancel()
@@ -269,11 +275,11 @@ async def background_tasks():
 
 
 if __name__ == "__main__":
-    # setup for kubernetes python client 
-    setup_k8s()
+    # setup for kubernetes python client
+    #setup_k8s()
     # Create a new tornado application with different HTTP handlers
-    # by calling functions. 
-    app = tornado.web.Application([ 
+    # by calling functions.
+    app = tornado.web.Application([
         (r"/pod_id", pod_id),
         (r"/send_election_msg", send_election_msg),
         (r"/send_ok", send_ok_msg),
@@ -283,15 +289,19 @@ if __name__ == "__main__":
         (r"/receive_coordinator", receive_coordinator)
     ], debug = True, autoreload = False)
 
-    # print server starting as an indicator that the server is starting. 
+    # print server starting as an indicator that the server is starting.
     print("server starting")
-    # The tornado.ioloop.IOLoop.current() retrieves the I/O-loop instance. 
-    # Then we use the spawn_callback(background_tasks) to run the background_tasks asynchronously. 
-    tornado.ioloop.IOLoop.current().spawn_callback(background_tasks)
-    # Listen on port Web_Port, which is specified in the yml files as 8000 and the address. 
+    # The tornado.ioloop.IOLoop.current() retrieves the I/O-loop instance.
+    # Then we use the spawn_callback(background_tasks) to run the background_tasks asynchronously.
+    args1 = "arg1"
+    args2 = "args2"
+    tornado.ioloop.IOLoop.current().spawn_callback(background_tasks, args1, args2)
+    # Listen on port Web_Port, which is specified in the yml files as 8000 and the address.
     app.listen(Web_Port, address='0.0.0.0')
-    # Start the I/O loop for handling requests and respond.  
+    # Start the I/O loop for handling requests and respond.
     tornado.ioloop.IOLoop.current().start()
+
+
 
 
    
