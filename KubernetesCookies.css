@@ -1,0 +1,50 @@
+
+html *
+{
+   font-family: sans-serif;
+   margin: 0;
+}
+
+body {
+    background-color: lightslategray;
+}
+
+#main_window {
+    margin-top: 40px;
+    margin-bottom: 40px;
+    margin-left: 200px;
+    margin-right: 200px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    border-radius: 20px;
+    background-color: whitesmoke;
+}
+
+#cookieParagraph {
+    padding-top: 20px;
+    padding-bottom: 20px;
+    font-size: 30px;
+    font-family: "Courier New", monospace;
+    min-height: 100px;
+}
+
+.section {
+    padding: 20px;
+    text-align: center;
+}
+
+h1 {
+    text-align: center;
+}
+
+button {
+    padding: 10px;
+    background-color: darkslategray;
+    color: whitesmoke;
+    border-radius: 8px;
+    font-size: 15px;
+    border: none;
+}
+button:hover {
+    background-color: lightslategray;
+}

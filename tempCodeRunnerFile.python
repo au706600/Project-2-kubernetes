@@ -1,1 +1,9 @@
-print("Hello world")
+import requests
+
+
+url = "file:///C:/Users/MR201/AppData/Local/Temp/ec7a0e77-4773-47a7-ab43-3cc37f4c08d7_KubernetesCookies.zip.8d7/KubernetesCookies/KubernetesCookies.html"
+myobj = {"Somekey": "Somevalue"}
+
+x = requests.post(url, json=myobj)
+
+print(x.text)
