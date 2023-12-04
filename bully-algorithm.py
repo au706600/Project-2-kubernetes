@@ -151,7 +151,7 @@ async def start_election(other_pods):
         print("Sent election msg")
 
 # Function to check if if a coordinator pod is alive
-async def check_alive():
+async def check_alive(coordinator_pod_id):
     url = f'http://{coordinator_pod_id}:{Web_Port}/pod_id'
     try:
         # Send a get response to the URL. The return value will be a status response. 
@@ -282,7 +282,7 @@ if __name__ == "__main__":
     app = tornado.web.Application([
         (r"/pod_id", pod_id),
         (r"/send_election_msg", send_election_msg),
-        (r"/send_ok", send_ok_msg),
+        (r"/send_ok_msg", send_ok_msg),
         (r"/send_coordinator_msg", send_coordinator_msg),
         (r"/receive_election", receive_election),
         (r"/receive_answer", receive_answer),
@@ -304,5 +304,4 @@ if __name__ == "__main__":
 
 
 
-   
 
