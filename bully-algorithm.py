@@ -183,10 +183,15 @@ async def send_election_msg(other_pods):
         url = f'http://{Ip}:{Web_Port}/receive_election'
         send_data = {"sender_Pod_Id": Pod_Id}
         # HTTP post request to the url with json data format. 
-        requests.post(url, json = send_data)
+        try: 
+            response = requests.post(url, json = send_data)
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            print(f"An error occurred: {e}")
+            return None
         # print
-        print(f"Sent election from Pod {Pod_Id} to {Ip}")
-    
+    print(f"Sent election from Pod {Pod_Id} to {Ip}")
+    return response
 
 # Function to send ok message
 async def send_ok_msg(sender_pod_id):
@@ -194,9 +199,15 @@ async def send_ok_msg(sender_pod_id):
     # Send ok message by POST request. 
     url = f'http://{sender_pod_id}:{Web_Port}/receive_answer'
     status = {"sender_Pod_Id": 'OK'}
-    send = requests.post(url, json = status)
+    try:
+        response = requests.post(url, json = status)
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+        print(f"An error occurred: {e}")
+        return None
+    # print
     print(f"Sent ok message from Pod {Pod_Id} to {sender_pod_id}")
-    return send
+    return response
 
 
 # Function to send coordinator message
@@ -209,8 +220,17 @@ async def send_coordinator_msg(other_pods):
         # Send coordinator message by POST request.
         url = f'http://{Ip}:{Web_Port}/receive_coordinator'
         data = {"coordinator_Pod_Id": Pod_Id}
-        requests.post(url, json = data)
+        try:
+            response = requests.post(url, json = data)
+            response.raise_for_status()
+        
+        except requests.exceptions.HTTPError as e:
+            print(f"An error occurred: {e}")
+            return None
+        # print
         print(f"Sent coordinator msg from Pod {Pod_Id} to {Ip}")
+
+        return response
 
 # POST /receive_election - election message
 # The process that receives an election message sends an OK message if a node ID
@@ -259,11 +279,11 @@ async def receive_coordinator(request: tornado.web.RequestHandler):
     await send_ok_msg(coordinator_Pod_Id)
 
 
-#def roothandler(request: tornado.web.RequestHandler):
- #   request.render("Webpage.html", leader_pod_id = leader_pod_id)
-
-#def mainhandler(request: tornado.web.RequestHandler):
- #   request.render("Webpage.html", leader_pod_id = leader_pod_id)
+async def html_handler(request: tornado.web.RequestHandler):
+    with open("Kubernetes Cookies.html", "r") as file:
+        content = file.read()
+    request.write(content)
+    await request.finish()
 
 # Function to run bully algorithm
 async def background_tasks(arg1, arg2):
@@ -286,7 +306,9 @@ if __name__ == "__main__":
         (r"/send_coordinator_msg", send_coordinator_msg),
         (r"/receive_election", receive_election),
         (r"/receive_answer", receive_answer),
-        (r"/receive_coordinator", receive_coordinator)
+        (r"/receive_coordinator", receive_coordinator),
+        (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "C:\\Users\\MR201\\Project-2-kubernetes"}),  # Serve static files
+        (r"/", html_handler),  
     ], debug = True, autoreload = False)
 
     # print server starting as an indicator that the server is starting.

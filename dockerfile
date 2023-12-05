@@ -2,6 +2,7 @@ FROM python:3.9.12
 ADD bully-algorithm.py /bully-algorithm.py
 # Copy requirements to container and install
 COPY requirements.txt requirements.txt
+COPY FortuneCookies.txt FortuneCookies.txt
 RUN pip install -r requirements.txt
 # Copy all to current dir
 COPY . .
