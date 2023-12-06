@@ -3,8 +3,8 @@ kind: Service
 metadata:
   name: bully-service
 spec:
-  #clusterIP: None
-  type: NodePort
+  clusterIP: None
+  #type: NodePort
   selector: 
     app: kubernetes
   ports: 

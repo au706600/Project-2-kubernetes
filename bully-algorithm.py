@@ -76,7 +76,7 @@ async def run_bully():
         # Get all pods doing bully
 
         ip_list = []
-        print("Making a DNS lookup to service")
+        print("Making a DNS lookup to service")  
         response = socket.getaddrinfo("bully-service", 0, 0, 0, 0)
         print("Get response from DNS")
 
@@ -280,7 +280,7 @@ async def receive_coordinator(request: tornado.web.RequestHandler):
 
 
 async def html_handler(request: tornado.web.RequestHandler):
-    with open("Kubernetes Cookies.html", "r") as file:
+    with open("index.html", "r") as file:
         content = file.read()
     request.write(content)
     await request.finish()
@@ -307,7 +307,7 @@ if __name__ == "__main__":
         (r"/receive_election", receive_election),
         (r"/receive_answer", receive_answer),
         (r"/receive_coordinator", receive_coordinator),
-        (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "C:\\Users\\MR201\\Project-2-kubernetes"}),  # Serve static files
+        (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "C:\\Users\\MR201\\Project-2-kubernetes"}),
         (r"/", html_handler),  
     ], debug = True, autoreload = False)
 
@@ -315,9 +315,9 @@ if __name__ == "__main__":
     print("server starting")
     # The tornado.ioloop.IOLoop.current() retrieves the I/O-loop instance.
     # Then we use the spawn_callback(background_tasks) to run the background_tasks asynchronously.
-    args1 = "arg1"
-    args2 = "args2"
-    tornado.ioloop.IOLoop.current().spawn_callback(background_tasks, args1, args2)
+    arg1 = "arg1"
+    arg2 = "arg2" 
+    tornado.ioloop.IOLoop.current().spawn_callback(background_tasks, arg1, arg2)
     # Listen on port Web_Port, which is specified in the yml files as 8000 and the address.
     app.listen(Web_Port, address='0.0.0.0')
     # Start the I/O loop for handling requests and respond.
