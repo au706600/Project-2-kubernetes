@@ -316,7 +316,7 @@ if __name__ == "__main__":
     # The tornado.ioloop.IOLoop.current() retrieves the I/O-loop instance.
     # Then we use the spawn_callback(background_tasks) to run the background_tasks asynchronously.
     arg1 = "arg1"
-    arg2 = "arg2" 
+    arg2 = "arg2"
     tornado.ioloop.IOLoop.current().spawn_callback(background_tasks, arg1, arg2)
     # Listen on port Web_Port, which is specified in the yml files as 8000 and the address.
     app.listen(Web_Port, address='0.0.0.0')
