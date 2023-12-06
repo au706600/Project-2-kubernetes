@@ -146,7 +146,7 @@ async def start_election(other_pods):
 
 
     else:
-        print("Starting election")
+        print("Starting election") 
         send_election_msg(higher_id)
         print("Sent election msg")
 
@@ -230,6 +230,7 @@ async def send_coordinator_msg(other_pods):
         # print
         print(f"Sent coordinator msg from Pod {Pod_Id} to {Ip}")
 
+        # return
         return response
 
 # POST /receive_election - election message
