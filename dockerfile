@@ -1,11 +1,17 @@
-FROM python:3.9.12
-ADD bully-algorithm.py /bully-algorithm.py
-# Copy requirements to container and install
-COPY requirements.txt requirements.txt
-COPY FortuneCookies.txt FortuneCookies.txt
-RUN pip install -r requirements.txt
+FROM python:3.12.1
+
+#ADD bully-algorithm.py /bully-algorithm.py
+
+WORKDIR /app
+
 # Copy all to current dir
-COPY . .
+COPY . /app
+
+# Copy requirements to container and install
+#COPY requirements.txt requirements.txt
+#COPY FortuneCookies.txt FortuneCookies.txt
+
+RUN pip install -r requirements.txt
 
 EXPOSE 8000
 # This will print python logs to output
