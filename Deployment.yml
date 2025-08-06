@@ -1,13 +1,13 @@
 
 apiVersion: apps/v1
-kind: Deployment
+kind: Deployment # Type of kubernetes resource, which is deployment
 metadata:
   name: kubernetes
-spec:
+spec: # Describes the desired state of the deployment
   selector:
     matchLabels:
       app: kubernetes
-  replicas: 5
+  replicas: 5 # How many pods to run
   template:
     metadata:
       name: kubernetes

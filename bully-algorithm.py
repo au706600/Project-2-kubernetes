@@ -27,7 +27,9 @@ import socket
 
 import random
 
-import requests
+#import requests
+
+from tornado.httpclient import AsyncHTTPClient
 
 import tornado.web
 
@@ -55,6 +57,8 @@ other_pods = {}
 coordinator_received = False
 
 higher_id = []
+
+http_client = AsyncHTTPClient()
 
 
 #https://github.com/kubernetes-client/python
@@ -91,7 +95,14 @@ async def run_bully():
 
         # Remove own pod ip from the list of pods
 
-        ip_list.remove(Pod_Ip)
+        #ip_list.remove(Pod_Ip)
+
+        try: 
+            ip_list.remove(Pod_Ip)
+            print(f"Removed own pod ip {Pod_Ip} from the list of pod ips: {ip_list}")
+        except ValueError:
+            print(f"Own pod ip {Pod_Ip} not found in the list of pod ips: {ip_list}")
+            continue
 
         print("Got %d other pod ip's" % (len(ip_list)))
 
@@ -102,12 +113,20 @@ async def run_bully():
         other_pods = dict()
 
         for pod_ip in ip_list:
-            endpoint = '/pod_id' 
-            url = 'http://' + str(pod_ip) + ':' + str(Web_Port) + endpoint
 
-            response = requests.get(url)
+            try:
+                #endpoint = '/pod_id' 
+                url = f"http://{pod_ip}:{Web_Port}"
 
-            other_pods[str(pod_ip)] = response.json()["Pod_Id"]
+                #response = requests.get(url)
+
+                response = await http_client.fetch(url, request_timeout=2.0)
+                #other_pods[str(pod_ip)] = response.json()["Pod_Id"]
+                other_pods[str(pod_ip)] = json.loads(response.body.decode('utf-8'))["Pod_Id"]
+            
+            except Exception as e:
+                print(f"Error fetching pod id from {pod_ip}: {str(e)}")
+                continue
         
         print(other_pods)
 
@@ -147,55 +166,51 @@ async def start_election(other_pods):
 
     # print
     print(f"Higher id's: {higher_id}")
-
-    # if there are, send election message to higher id's
-    for Ip in higher_id:
-        url = f"http://{Ip}:{Web_Port}/receive_election"
-        send_data = {"sender_Pod_Id": Pod_Id}
-        # Send election msg by sending a post request to the url. 
-        requests.post(url, json = send_data)
-        print(f"Sent election from Pod{Pod_Id} to {Ip}")
     
     # if there are no higher id's
     # start election
     if len(higher_id) == 0:
-        print("No higher id's, starting election")
+        print(f"[Pod {Pod_Id}] No higher IDs, becoming leader")
         leader_pod_id = Pod_Id
         print(f"The leader pod id is: {leader_pod_id}")
         await send_coordinator_msg(other_pods)
-
+        return
 
     else:
-        print("Starting election") 
-        await send_election_msg(other_pods)
-        print("Sent election msg")
+        print(f"[Pod {Pod_Id}] Sending election to higher IDs: {higher_id}") 
+        await send_election_msg(higher_id)
 
 # Function to check if if a coordinator pod is alive
 async def check_alive(coordinator_pod_id):
     url = f'http://{coordinator_pod_id}:{Web_Port}/pod_id'
     try:
         # Send a get response to the URL. The return value will be a status response. 
-        response = requests.get(url)
-        return response.status_code == 200
+        #response = requests.get(url)
+        #return response.status_code == 200
+        response = await http_client.fetch(url, request_timeout=2.0)
+        return response.code == 200
     
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         print(f"An error occurred: {e}")
         return False
 
+
 # GET /pod_id
 # Function to get pod id
-async def pod_id(request: tornado.web.RequestHandler):
+def pod_id(self):
     global Pod_Id
-    # write the json encoded Pod_Id to the response body of the request handler. 
-    request.write(json.dumps({"Pod_Id": Pod_Id}))
+
     # add header to the response
-    request.set_header("Hello", "json")
+    self.set_header("Content-Type", "application/json")
+    # write the json encoded Pod_Id to the response body of the request handler. 
+    self.write(json.dumps({"Pod_Id": Pod_Id}))
     # finish the response
-    request.finish()
+    self.finish()
 
 # Function to send election message 
 async def send_election_msg(other_pods):
     global Pod_Id
+    success = True
     # list comprehension variable to list for any higher id's
     higher_id = [Ip for Ip, Id in other_pods.items() if Id > Pod_Id]
     # In this for loop, we send message to higher id's. 
@@ -206,14 +221,15 @@ async def send_election_msg(other_pods):
         send_data = {"sender_Pod_Id": Pod_Id}
         # HTTP post request to the url with json data format. 
         try: 
-            response = requests.post(url, json = send_data)
-            response.raise_for_status()
-        except requests.exceptions.HTTPError as e:
+            #response = requests.post(url, json = send_data)
+            #response.raise_for_status()
+            await http_client.fetch(url, method='POST', body=json.dumps(send_data), request_timeout=2.0)
+        except Exception as e:
             print(f"An error occurred: {e}")
-            return None
+            success = False
         # print
     print(f"Sent election from Pod {Pod_Id} to {Ip}")
-    return response
+    return success
 
 # Function to send ok message
 async def send_ok_msg(sender_pod_id):
@@ -222,14 +238,15 @@ async def send_ok_msg(sender_pod_id):
     url = f'http://{sender_pod_id}:{Web_Port}/receive_answer'
     status = {"sender_Pod_Id": 'OK'}
     try:
-        response = requests.post(url, json = status)
-        response.raise_for_status()
-    except requests.exceptions.HTTPError as e:
+        #response = requests.post(url, json = status)
+        #response.raise_for_status()
+        await http_client.fetch(url, method='POST', body=json.dumps(status), request_timeout=2.0)
+        # print
+        print(f"Sent ok message from Pod {Pod_Id} to {sender_pod_id}")
+        return True
+    except Exception as e:
         print(f"An error occurred: {e}")
-        return None
-    # print
-    print(f"Sent ok message from Pod {Pod_Id} to {sender_pod_id}")
-    return response
+        return False
 
 
 # Function to send coordinator message
@@ -237,6 +254,8 @@ async def send_coordinator_msg(other_pods):
     # list comprehension variable to list for any lower id's
     global Pod_Id
     lower_id = [Ip for Ip, Id in other_pods.items() if Id < Pod_Id]
+    print(f"[Pod {Pod_Id}] Sending coordinator message to lower id's: {lower_id}")
+
     # In this for loop, we send message to lower id's.
     for Ip in lower_id:
         #endpoint = '/receive coordinator'
@@ -244,17 +263,17 @@ async def send_coordinator_msg(other_pods):
         url = f'http://{Ip}:{Web_Port}/receive_coordinator'
         data = {"coordinator_Pod_Id": Pod_Id}
         try:
-            response = requests.post(url, json = data)
-            response.raise_for_status()
-        
-        except requests.exceptions.HTTPError as e:
+            #response = requests.post(url, json = data)
+            #response.raise_for_status()
+            await http_client.fetch(url, method='POST', body=json.dumps(data), request_timeout=2.0)
+        except Exception as e:
             print(f"An error occurred: {e}")
-            return None
+            return False
         # print
         print(f"Sent coordinator msg from Pod {Pod_Id} to {Ip}")
 
     # return
-    return response
+    return True
     
 
 # POST /receive_election - election message
@@ -262,12 +281,12 @@ async def send_coordinator_msg(other_pods):
 # is higher than its own. It then restarts and initiates an election message. 
 # The process that receives an election message sends a coordinator message if it is the node 
 # with highest Id. 
-async def receive_election(request: tornado.web.RequestHandler):
+async def receive_election(self):
     global Pod_Id, other_pods
     # parse json
     # get sender_Pod_Id and coordinator_Pod_Id by sending GET request. 
     #sender_Pod_Id = int(request.get("sender_Pod_Id"))
-    data = json.loads(request.request.body.decode('utf-8'))
+    data = json.loads(self.request.body.decode('utf-8'))
     sender_Pod_Id = int(data.get("sender_Pod_Id"))
     #coordinator_Pod_Id = int(request.get("coordinator_Pod_Id"))
     print(f"Received election message from {sender_Pod_Id}")
@@ -281,14 +300,14 @@ async def receive_election(request: tornado.web.RequestHandler):
         print(f"Pod {Pod_Id} received election from higher pod, not responding with Ok")
 
 # POST /receive_answer - OK message
-async def receive_answer(request: tornado.web.RequestHandler):
+async def receive_answer(self):
     # parse json
     # get by sending GET request.
     #status = int(request.get("sender_Pod_Id"))
 
     global coordinator_pod_id
 
-    data = json.loads(request.request.body.decode('utf-8'))
+    data = json.loads(self.request.body.decode('utf-8'))
     status = data.get("sender_Pod_Id")
 
     # if status is OK, print
@@ -302,12 +321,12 @@ async def receive_answer(request: tornado.web.RequestHandler):
         print(f"Received coordinator message, and the new coordinator is: {coordinator_pod_id}")
 
 # POST /receive_coordinator - Coordinator message
-async def receive_coordinator(request: tornado.web.RequestHandler):
+async def receive_coordinator(self):
     global leader_pod_id, coordinator_received, coordinator_pod_id
     # parse json
     #coordinator_pod_id = int(request.get("coordinator_Pod_Id"))
 
-    data = json.loads(request.request.body.decode('utf-8'))
+    data = json.loads(self.request.body.decode('utf-8'))
     coordinator_pod_id = int(data.get("coordinator_Pod_Id"))
     # print
     print(f"Received coordination message from Pod {coordinator_pod_id}")
@@ -319,11 +338,11 @@ async def receive_coordinator(request: tornado.web.RequestHandler):
     await send_ok_msg(coordinator_pod_id)
 
 
-async def html_handler(request: tornado.web.RequestHandler):
+def html_handler(self):
     with open("index.html", "r") as file:
         content = file.read()
-    request.write(content)
-    request.finish()
+    self.write(content)
+    self.finish()
 
 # Function to run bully algorithm
 async def background_tasks():
@@ -332,7 +351,8 @@ async def background_tasks():
         task = asyncio.create_task(run_bully())
         await task
     except asyncio.CancelledError:
-        print("Background tasks cancelled")
+        print("Background tasks cancelled") 
+        
 
 
 
