@@ -18,4 +18,3 @@ EXPOSE 8000
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONIOENCODING=UTF-8
 
-CMD [ "python", "-u", "bully-algorithm.py"]

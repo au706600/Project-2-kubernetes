@@ -60,7 +60,37 @@ higher_id = []
 
 http_client = AsyncHTTPClient()
 
+#--------------------------------
+# Request Handlers
+class PodIdHandler(tornado.web.RequestHandler):
+    def get(self):
+        global Pod_Id
+        self.set_header("Content-Type", "application/json")
+        self.write(json.dumps({"Pod_Id": Pod_Id}))
+        self.finish()
 
+class ElectionHandler(tornado.web.RequestHandler):
+    async def post(self):
+        data = json.loads(self.request.body)
+        sender_id = data["sender_Pod_Id"]
+        print(f"Received election from {sender_id}")
+        await receive_election(sender_id)
+        self.write({"status": "ACK"})
+
+class AnswerHandler(tornado.web.RequestHandler):
+    async def post(self):
+        data = json.loads(self.request.body)
+        await receive_answer(data)
+        self.write({"status": "ACK"})
+
+class CoordinatorHandler(tornado.web.RequestHandler):
+    async def post(self):
+        data = json.loads(self.request.body)
+        await receive_coordinator(data)
+        self.write({"status": "ACK"})
+
+#---------------------------------
+# Bully logic
 #https://github.com/kubernetes-client/python
 # If you need to do setup of Kubernetes, i.e. if using Kubernetes Python client
 async def setup_k8s():
@@ -159,6 +189,7 @@ async def run_bully():
         # Repeat after sleeping
         await asyncio.sleep(2)
 
+
 async def start_election(other_pods):
     global leader_pod_id, Pod_Id
     # a list comprehension variable to get the higher id's
@@ -193,8 +224,9 @@ async def check_alive(coordinator_pod_id):
     except Exception as e:
         print(f"An error occurred: {e}")
         return False
+    
 
-
+"""
 # GET /pod_id
 # Function to get pod id
 def pod_id(self):
@@ -206,6 +238,7 @@ def pod_id(self):
     self.write(json.dumps({"Pod_Id": Pod_Id}))
     # finish the response
     self.finish()
+"""
 
 # Function to send election message 
 async def send_election_msg(other_pods):
@@ -337,12 +370,25 @@ async def receive_coordinator(self):
     # send ok message to the sender
     await send_ok_msg(coordinator_pod_id)
 
+class htmlHandler(tornado.web.RequestHandler):
+    def get(self):
+        try:
+            with open("/app/index.html", "r") as file:
+                content = file.read()
+            self.write(content)
+            self.finish()
+        except FileNotFoundError:
+            self.set_status(404)
+            self.write("HTML file not found.")
+            self.finish()
 
+"""
 def html_handler(self):
     with open("index.html", "r") as file:
         content = file.read()
     self.write(content)
     self.finish()
+"""
 
 # Function to run bully algorithm
 async def background_tasks():
@@ -354,15 +400,47 @@ async def background_tasks():
         print("Background tasks cancelled") 
         
 
+if __name__ == "__main__":
+    async def main():
+        try: 
+            await setup_k8s()
+
+            app = tornado.web.Application([
+                (r"/pod_id", PodIdHandler), 
+                (r"/Election", ElectionHandler), 
+                (r"/Answer", AnswerHandler), 
+                (r"/Coordinator", CoordinatorHandler), 
+                (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "/app"}), 
+                (r"/", htmlHandler),
+            ], debug=True, autoreload=False)
+
+            app.listen(Web_Port, address='0.0.0.0')
+            print(f"Server started on http://{Pod_Ip}:{Web_Port}")
+
+            loop = asyncio.get_event_loop()
+            bully_task = loop.create_task(background_tasks())
+            await tornado.ioloop.IOLoop.current().start()
+            
+        except Exception as e: 
+            print(f"An error occurred: {str(e)}")
+            raise
+    
+    try: 
+        asyncio.run(main())
+    except Exception as e:
+        print(f"Critical failure: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 
+"""
 if __name__ == "__main__":
     # setup for kubernetes python client
-    #setup_k8s()
+    setup_k8s()
     # Create a new tornado application with different HTTP handlers
     # by calling functions.
     app = tornado.web.Application([
-        (r"/pod_id", pod_id),
+        (r"/pod_id", PodIdHandler),
         #(r"/send_election_msg", send_election_msg),    
         (r"/send_ok_msg", send_ok_msg),
         (r"/send_coordinator_msg", send_coordinator_msg),
@@ -370,20 +448,21 @@ if __name__ == "__main__":
         (r"/receive_answer", receive_answer),
         (r"/receive_coordinator", receive_coordinator),
         (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "/app"}),
-        (r"/", html_handler),  
+        (r"/", htmlHandler),  
     ], debug = True, autoreload = False)
 
     # print server starting as an indicator that the server is starting.
     print("server starting")
     # The tornado.ioloop.IOLoop.current() retrieves the I/O-loop instance.
     # Then we use the spawn_callback(background_tasks) to run the background_tasks asynchronously.
-    arg1 = "arg1"
-    arg2 = "arg2"
+    #arg1 = "arg1"
+    #arg2 = "arg2"
     tornado.ioloop.IOLoop.current().spawn_callback(background_tasks)
     # Listen on port Web_Port, which is specified in the yml files as 8000 and the address.
     app.listen(Web_Port, address='0.0.0.0')
     # Start the I/O loop for handling requests and respond.
     tornado.ioloop.IOLoop.current().start()
+"""
 
 
 
