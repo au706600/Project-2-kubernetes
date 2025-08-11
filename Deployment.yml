@@ -18,7 +18,22 @@ spec: # Describes the desired state of the deployment
       containers:
         - name: kubernetes
           image: 202106601/kubernetes
-          #imagePullPolicy: Never
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 40 # Wait for app to start
+            periodSeconds: 15 # Check every 10 seconds
+            timeoutSeconds: 5 # Wait for 5 seconds for response
+            failureThreshold: 3 # If 3 failures, restart the pod
+          
+          readinessProbe: 
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30 # Wait for app to start
+            periodSeconds: 10  
+            failureThreshold: 3 # If 3 failures, pod is not ready
           env:
             - name: Web_Port
               value: "8000"

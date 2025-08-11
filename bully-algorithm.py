@@ -58,12 +58,14 @@ coordinator_received = False
 
 higher_id = []
 
+app_ready = False
+
 http_client = AsyncHTTPClient()
 
 #--------------------------------
 # Request Handlers
 class PodIdHandler(tornado.web.RequestHandler):
-    def get(self):
+    async def get(self):
         global Pod_Id
         self.set_header("Content-Type", "application/json")
         self.write(json.dumps({"Pod_Id": Pod_Id}))
@@ -72,22 +74,54 @@ class PodIdHandler(tornado.web.RequestHandler):
 class ElectionHandler(tornado.web.RequestHandler):
     async def post(self):
         data = json.loads(self.request.body)
-        sender_id = data["sender_Pod_Id"]
-        print(f"Received election from {sender_id}")
-        await receive_election(sender_id)
+        sender_pod_id = int(data["sender_Pod_Id"])
+        print(f"Received election from {sender_pod_id}")
+        await receive_election(sender_pod_id)
         self.write({"status": "ACK"})
 
 class AnswerHandler(tornado.web.RequestHandler):
     async def post(self):
         data = json.loads(self.request.body)
-        await receive_answer(data)
+        status = data.get("sender_Pod_Id")
+        coordinator_id = data.get("coordinator_Pod_Id")
+        await receive_answer(status, coordinator_id)
         self.write({"status": "ACK"})
 
 class CoordinatorHandler(tornado.web.RequestHandler):
     async def post(self):
         data = json.loads(self.request.body)
-        await receive_coordinator(data)
+        coordinator_id = int(data.get("coordinator_Pod_Id"))
+        await receive_coordinator(coordinator_id)
         self.write({"status": "ACK"})
+
+class healthHandler(tornado.web.RequestHandler):
+    async def get(self):
+        if not app_ready:
+            self.set_status(503)
+            self.write({"status": "Server starting"})
+            return 
+        
+        try: 
+            self.set_header("Content-Type", "application/json")
+            self.write({"status":"OK"})
+        
+        except Exception as e:
+            print(f"[ERROR] Health check failed: {e}")
+            self.set_status(500)
+            self.write({"status": "ERROR"})
+
+
+class htmlHandler(tornado.web.RequestHandler):
+    async def get(self):
+        try:
+            with open("index.html", "r") as file:
+                content = file.read()
+            self.write(content)
+            self.set_header("Content-Type", "text/html")
+        except FileNotFoundError:
+            self.set_status(404)
+            self.write("HTML file not found.")
+            self.finish()
 
 #---------------------------------
 # Bully logic
@@ -107,52 +141,63 @@ async def setup_k8s():
 
 async def run_bully():
     global Pod_Ip, leader_pod_id, coordinator_pod_id, coordinator_received, Pod_Id, other_pods
+
     while True: 
         print("Running bully")
+
         # wait for everything to be set up
-        await asyncio.sleep(5)
-
-        # Get all pods doing bully
-
-        ip_list = []
-        print("Making a DNS lookup to service")  
-        response = socket.getaddrinfo("bully-service", 0, 0, 0, 0)
-        print("Get response from DNS")
-
-        for result in response: 
-            ip_list.append(result[-1][0])
-        ip_list = list(set(ip_list))
-
-        # Remove own pod ip from the list of pods
-
-        #ip_list.remove(Pod_Ip)
+        await asyncio.sleep(10)
 
         try: 
-            ip_list.remove(Pod_Ip)
-            print(f"Removed own pod ip {Pod_Ip} from the list of pod ips: {ip_list}")
-        except ValueError:
-            print(f"Own pod ip {Pod_Ip} not found in the list of pod ips: {ip_list}")
+            # Get all pods doing bully
+
+            ip_list = []
+            print("Making a DNS lookup to service")  
+            response = socket.getaddrinfo("bully-service", 0, 0, 0, 0)
+            print("Get response from DNS")
+
+            for result in response: 
+                ip_list.append(result[-1][0])
+            ip_list = list(set(ip_list))
+
+            print(f"Got {len(ip_list)} pod IPs from DNS")
+
+            count_ip_list = len(ip_list)
+
+            ip_list = [ip for ip in ip_list if ip != Pod_Ip]
+
+            if len(ip_list) != count_ip_list:
+                print(f"Removed own pod ip {Pod_Ip} from the list of pod ips: {ip_list}")
+            else:
+                print(f"Own pod ip {Pod_Ip} not found in the list of pod ips: {ip_list}")
+
+            if not ip_list:
+                print("No other pods found, skipping election this round")
+                await asyncio.sleep(5)
+                continue
+
+            # Remove own pod ip from the list of pods
+            #ip_list.remove(Pod_Ip)
+
+        except Exception as e:
+            # Handle DNS lookup failure or IP processing error
+            print(f"[ERROR] Failed DNS lookup or IP processing: {e}")
+            await asyncio.sleep(5)
             continue
 
-        print("Got %d other pod ip's" % (len(ip_list)))
-
-        # Get Id's of other pods by sending a GET request to them
-
-        await asyncio.sleep(random.randint(1, 5))
-
-        other_pods = dict()
+        other_pods = {}
 
         for pod_ip in ip_list:
 
             try:
                 #endpoint = '/pod_id' 
-                url = f"http://{pod_ip}:{Web_Port}"
+                url = f"http://{pod_ip}:{Web_Port}/pod_id"
 
                 #response = requests.get(url)
 
                 response = await http_client.fetch(url, request_timeout=2.0)
                 #other_pods[str(pod_ip)] = response.json()["Pod_Id"]
-                other_pods[str(pod_ip)] = json.loads(response.body.decode('utf-8'))["Pod_Id"]
+                other_pods[pod_ip] = json.loads(response.body.decode('utf-8'))["Pod_Id"]
             
             except Exception as e:
                 print(f"Error fetching pod id from {pod_ip}: {str(e)}")
@@ -162,28 +207,33 @@ async def run_bully():
 
         print(f"current leader pod id: {leader_pod_id}")
 
-        # If P_k notices a non-responding coordinator, it initiates election by calling function
-        if coordinator_pod_id == None or not await check_alive(coordinator_pod_id):
-            print("Initiating election")
-            await start_election(other_pods)
-            print(f"[Pod {Pod_Id}] waiting for coordinator message")
-            coordinator_received = False
+        try:
+            # If P_k notices a non-responding coordinator, it initiates election by calling function
+            if coordinator_pod_id == None or not await check_alive(coordinator_pod_id):
+                print("Initiating election")
+                await start_election(other_pods)
+                print(f"[Pod {Pod_Id}] waiting for coordinator message")
+                coordinator_received = False
 
-            for _ in range(5): 
-                await asyncio.sleep(5)
-                if coordinator_received:
-                    print(f"[Pod {Pod_Id}] Coordinator elected: Pod {leader_pod_id}")
-                    return
-                
-                if not coordinator_received:
-                    print(f"[Pod {Pod_Id}] No coordinator elected, becoming leader")
-                    leader_pod_id = Pod_Id
-                    coordinator_pod_id = Pod_Ip
-                    await send_coordinator_msg(other_pods)
+                for _ in range(5): 
+                    await asyncio.sleep(5)
+
+                    if coordinator_received:
+                        print(f"[Pod {Pod_Id}] Coordinator elected: Pod {leader_pod_id}")
+                        return
+                    
+                    else:
+                        print(f"[Pod {Pod_Id}] No coordinator elected, becoming leader")
+                        leader_pod_id = Pod_Id
+                        coordinator_pod_id = Pod_Ip
+                        await send_coordinator_msg(other_pods)
+            
+            else:
+                # Else we do not start election due to lower id
+                print("Not starting election due to lower id")
         
-        else:
-            # Else we do not start election due to lower id
-            print("Not starting election due to lower id")
+        except Exception as e:
+            print(f"[ERROR] Election process failed: {e}")
 
         
         # Repeat after sleeping
@@ -191,30 +241,42 @@ async def run_bully():
 
 
 async def start_election(other_pods):
-    global leader_pod_id, Pod_Id
+    global leader_pod_id, Pod_Id, coordinator_pod_id
+
+    print(f"[Pod {Pod_Id}] Starting election...")
+
     # a list comprehension variable to get the higher id's
-    higher_id = [Ip for Ip, Id in other_pods.items() if Id > Pod_Id]
+    higher_id = {ip: pid for ip, pid in other_pods.items() if pid > Pod_Id}
 
     # print
     print(f"Higher id's: {higher_id}")
     
-    # if there are no higher id's
-    # start election
-    if len(higher_id) == 0:
+    if not higher_id:
         print(f"[Pod {Pod_Id}] No higher IDs, becoming leader")
         leader_pod_id = Pod_Id
         print(f"The leader pod id is: {leader_pod_id}")
-        await send_coordinator_msg(other_pods)
+        coordinator_pod_id = Pod_Ip
         return
+    
+    for pod_ip, pid in higher_id.items():
+        if not await check_alive(pod_ip):
+            print(f"[Pod {Pod_Id}] Skipping Pod {pid} ({pod_ip}) - not alive")
+            continue
 
-    else:
-        print(f"[Pod {Pod_Id}] Sending election to higher IDs: {higher_id}") 
-        await send_election_msg(higher_id)
+        try: 
+            url = f'http://{pod_ip}:{Web_Port}/election'
+            response = await http_client.fetch(url, request_timeout=2.0)
+            print(f"[Pod {Pod_Id}] Sent election to Pod {pid}, response: {response.code}")
+        
+        except Exception as e: 
+            print(f"[Pod {Pod_Id}] Failed to send election to Pod {pid}: {e}")
+            continue
+        
 
 # Function to check if if a coordinator pod is alive
-async def check_alive(coordinator_pod_id):
-    url = f'http://{coordinator_pod_id}:{Web_Port}/pod_id'
+async def check_alive(pod_ip):
     try:
+        url = f'http://{pod_ip}:{Web_Port}/health'
         # Send a get response to the URL. The return value will be a status response. 
         #response = requests.get(url)
         #return response.status_code == 200
@@ -222,23 +284,8 @@ async def check_alive(coordinator_pod_id):
         return response.code == 200
     
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"[WARN] Pod {pod_ip} did not respond to health check: {e}")
         return False
-    
-
-"""
-# GET /pod_id
-# Function to get pod id
-def pod_id(self):
-    global Pod_Id
-
-    # add header to the response
-    self.set_header("Content-Type", "application/json")
-    # write the json encoded Pod_Id to the response body of the request handler. 
-    self.write(json.dumps({"Pod_Id": Pod_Id}))
-    # finish the response
-    self.finish()
-"""
 
 # Function to send election message 
 async def send_election_msg(other_pods):
@@ -314,34 +361,34 @@ async def send_coordinator_msg(other_pods):
 # is higher than its own. It then restarts and initiates an election message. 
 # The process that receives an election message sends a coordinator message if it is the node 
 # with highest Id. 
-async def receive_election(self):
+async def receive_election(sender_pod_id):
     global Pod_Id, other_pods
     # parse json
     # get sender_Pod_Id and coordinator_Pod_Id by sending GET request. 
     #sender_Pod_Id = int(request.get("sender_Pod_Id"))
-    data = json.loads(self.request.body.decode('utf-8'))
-    sender_Pod_Id = int(data.get("sender_Pod_Id"))
+    #data = json.loads(sender_id.request.body.decode('utf-8'))
+    #sender_Pod_Id = int(data.get("sender_Pod_Id"))
     #coordinator_Pod_Id = int(request.get("coordinator_Pod_Id"))
-    print(f"Received election message from {sender_Pod_Id}")
+    print(f"Received election message from {sender_pod_id}")
 
     # if sender_Pod_Id is higher than Pod_Id, send coordinator message
-    if Pod_Id > sender_Pod_Id: 
-        await send_ok_msg(sender_Pod_Id)
+    if Pod_Id > sender_pod_id: 
+        await send_ok_msg(sender_pod_id)
         await start_election(other_pods)
     # else send coordinator message
     else:
         print(f"Pod {Pod_Id} received election from higher pod, not responding with Ok")
 
 # POST /receive_answer - OK message
-async def receive_answer(self):
+async def receive_answer(status, coordinator_id=None):
     # parse json
     # get by sending GET request.
     #status = int(request.get("sender_Pod_Id"))
 
     global coordinator_pod_id
 
-    data = json.loads(self.request.body.decode('utf-8'))
-    status = data.get("sender_Pod_Id")
+    #data = json.loads(sender_id.request.body.decode('utf-8'))
+    #status = data.get("sender_Pod_Id")
 
     # if status is OK, print
     if status == "OK":
@@ -350,45 +397,28 @@ async def receive_answer(self):
     # else print new coordinator
     else:
         #coordinator_pod_id = request.get("coordinator_Pod_Id")
-        coordinator_pod_id = int(data.get("coordinator_Pod_Id"))
+        #data = json.loads(status.request.body.decode('utf-8'))
+        #coordinator_pod_id = int(data.get("coordinator_Pod_Id"))
+        coordinator_pod_id = int(coordinator_id)
         print(f"Received coordinator message, and the new coordinator is: {coordinator_pod_id}")
 
 # POST /receive_coordinator - Coordinator message
-async def receive_coordinator(self):
+async def receive_coordinator(coordinator_id):
     global leader_pod_id, coordinator_received, coordinator_pod_id
     # parse json
     #coordinator_pod_id = int(request.get("coordinator_Pod_Id"))
 
-    data = json.loads(self.request.body.decode('utf-8'))
-    coordinator_pod_id = int(data.get("coordinator_Pod_Id"))
+    #data = json.loads(coordinator_id.request.body.decode('utf-8'))
+    #coordinator_pod_id = int(data.get("coordinator_Pod_Id"))
     # print
-    print(f"Received coordination message from Pod {coordinator_pod_id}")
+    print(f"Received coordination message from Pod {coordinator_id}")
     # After receiving a coordinator message, treat the sender as the coordinator
-    leader_pod_id = coordinator_pod_id
+    leader_pod_id = coordinator_id
+    coordinator_pod_id = coordinator_id
     
     coordinator_received = True
     # send ok message to the sender
-    await send_ok_msg(coordinator_pod_id)
-
-class htmlHandler(tornado.web.RequestHandler):
-    def get(self):
-        try:
-            with open("/app/index.html", "r") as file:
-                content = file.read()
-            self.write(content)
-            self.finish()
-        except FileNotFoundError:
-            self.set_status(404)
-            self.write("HTML file not found.")
-            self.finish()
-
-"""
-def html_handler(self):
-    with open("index.html", "r") as file:
-        content = file.read()
-    self.write(content)
-    self.finish()
-"""
+    await send_ok_msg(coordinator_id)
 
 # Function to run bully algorithm
 async def background_tasks():
@@ -402,14 +432,16 @@ async def background_tasks():
 
 if __name__ == "__main__":
     async def main():
+        global app_ready
         try: 
             await setup_k8s()
 
             app = tornado.web.Application([
                 (r"/pod_id", PodIdHandler), 
-                (r"/Election", ElectionHandler), 
-                (r"/Answer", AnswerHandler), 
-                (r"/Coordinator", CoordinatorHandler), 
+                (r"/receive_election", ElectionHandler), 
+                (r"/receive_answer", AnswerHandler), 
+                (r"/receive_coordinator", CoordinatorHandler),
+                (r"/health", healthHandler),
                 (r"/static/(.*)", tornado.web.StaticFileHandler, {"path": "/app"}), 
                 (r"/", htmlHandler),
             ], debug=True, autoreload=False)
@@ -417,9 +449,11 @@ if __name__ == "__main__":
             app.listen(Web_Port, address='0.0.0.0')
             print(f"Server started on http://{Pod_Ip}:{Web_Port}")
 
+            app_ready = True
+
             loop = asyncio.get_event_loop()
-            bully_task = loop.create_task(background_tasks())
-            await tornado.ioloop.IOLoop.current().start()
+            loop.create_task(background_tasks())
+            tornado.ioloop.IOLoop.current().start()
             
         except Exception as e: 
             print(f"An error occurred: {str(e)}")
