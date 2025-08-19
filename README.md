@@ -63,6 +63,7 @@ Before running the project, ensure you have the following installed:
 To run the project locally, run the following steps: 
 
 1. **Clone the repository**
+   
 If you haven't yet, first set up Git and authentication with GitHub.com from Git. For more information, please see <a href="https://docs.github.com/en/get-started/git-basics/set-up-git">Set up Git</a>. Click on <> Code and copy the URL of the repository that should look like the following:  
 
 ```bash
