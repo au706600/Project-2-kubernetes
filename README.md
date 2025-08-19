@@ -77,6 +77,7 @@ If you haven't yet, first set up Git and authentication with GitHub.com from Git
 ```
 
 3. **Install Dependencies**
+   
 Make sure you have pip installed. Then install packages: 
 ```bash
    pip install
