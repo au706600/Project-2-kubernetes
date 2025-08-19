@@ -59,26 +59,47 @@ Before running the project, ensure you have the following installed:
 
 ## 📦 Installation & Deployment
 
+### Installation
 To run the project locally, run the following steps: 
 
-1. Clone the repository
+1. **Clone the repository**
 If you haven't yet, first set up Git and authentication with GitHub.com from Git. For more information, please see <a href="https://docs.github.com/en/get-started/git-basics/set-up-git">Set up Git</a>. Click on <> Code and copy the URL of the repository that should look like the following:  
 
 ```bash
    git clone https://github.com/au706600/Project-2-kubernetes.git
 ```
 
-2. Open Git Bash in whatever local file location in your computer and run the following:
+2. **Open Git Bash in whatever local file location in your computer and run the following**
 
 ```bash
    git clone https://github.com/au706600/Project-2-kubernetes.git
    cd Project-2-kubernetes
 ```
 
-3. Install Dependencies
+3. **Install Dependencies**
 Make sure you have pip installed. Then install packages: 
 ```bash
    pip install
+```
+
+### Deployment
+
+1. **Start minikube by running the following command in cmd**
+
+```
+minikube start
+```
+
+2. **Navigate to where your project directory is located on your computer and build the docker image**
+
+```
+docker build -t <name of dockerimage>
+```
+
+3. **Apply the configuration files**
+```
+kubectl apply -f Deployment.yml
+kubectl apply -f Services.yml
 ```
 
 
@@ -88,6 +109,7 @@ Make sure you have pip installed. Then install packages:
 ├── Deployment.yml 
 ├── FortuneCookies.txt
 ├── KubernetesCookies.css
+├── README.md
 ├── Services.yml
 ├── bully-algorithm.py
 ├── dockerfile
