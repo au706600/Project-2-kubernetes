@@ -1,6 +1,6 @@
 
 apiVersion: apps/v1
-kind: StatefulSet # Type of kubernetes resource, which is deployment
+kind: StatefulSet # Type of kubernetes resource, which is StatefulSet
 metadata:
   name: kubernetes
 spec: # Describes the desired state of the deployment
