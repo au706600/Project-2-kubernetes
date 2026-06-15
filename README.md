@@ -40,11 +40,11 @@ Before running the project, ensure you have the following installed:
 
 - 🍪 Random fortune cookie generator.
 
-- 🔁 Multiple pods for fault tolerance.
+- 🔁 Multiple pods for fault tolerance and high availability. 
 
 - 👑 Leader election using Bully Algorithm.
 
-- ⚡ Automatic recovery when leader pod fails.
+- ⚡ Automatic recovery when leader pod fails through leader election. 
 
 ## 🛠️ Tech Stack 
 
@@ -125,16 +125,18 @@ kubectl apply -f Services.yml
 
 ## ⚠️ Issues/Problems
 
-- Currently, after running the Dockerfile and applying the Kubernetes configuration files (Deployment.yml and Services.yml), the pods do not reach the READY state, when running the following command:
+- After running the Dockerfile and applying the Kubernetes configuration files (Deployment.yml and Services.yml), the pods did not reach the READY state, when running the following command:
 ```
 kubectl get pods
 ```
 
-This is likely due to configuration issues in the Deployment or Service definition (e.g. container start-up delays or networking between pods).
+This was due to misconfiguration in the Deployment.yml (The application relied on unique node IDs for the leader election process, but the identity provided by the Deployment was not consistent with the way pod_id values were determined in the system).
 
-As a result, the website is not accessible and hence isn't served, which makes it difficult to test the Bully-algorithm. 
+As a result, the application inside the pods repeatedly crashed, leading to a CrashLoopBackOff state and making the website unavailable. This also prevented testing of the Bully algorithm.
 
-- However we can test to see, if a pod can be connected to the port 8000 with our html website in a kubernetes cluster, which we have set manually. The command to forward a pod name to select a matching port
+Furthermore, an additional issue was identified, where two event loops were running concurrently, which also contributed to the pods entering in a CrashLoopBackOff state.
+
+- However we could test to see, if a pod can be connected to the port 8000 with our html website in a kubernetes cluster, which we have set manually. The command to forward a pod name to select a matching port
 to forward to is port-forwarding, which forwards from ip-address that the kubernetes-cluster is running to the port, we have set manually:
 
 ```
