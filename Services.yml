@@ -3,11 +3,11 @@ kind: Service # Type of Kubernetes resource, which is Service
 metadata:
   name: bully-service
 spec:
-  clusterIP: None
+  clusterIP: None # None for headless service
   #type: NodePort
   selector: # specifies the set of pods targeted by the service. 
     app: kubernetes
   ports: 
     - protocol: TCP
-      port: 8000
+      port: 80
       targetPort: 8000

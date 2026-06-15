@@ -1,7 +1,9 @@
 
+asyncio
 
-requests == 2.31.0
+kubernetes
 
-tornado == 6.4
+requests
 
-kubernetes == 33.1.0
+tornado
+

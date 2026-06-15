@@ -1,39 +1,23 @@
 
 apiVersion: apps/v1
-kind: Deployment # Type of kubernetes resource, which is deployment
+kind: StatefulSet # Type of kubernetes resource, which is deployment
 metadata:
   name: kubernetes
 spec: # Describes the desired state of the deployment
+  serviceName: bully-service
+  replicas: 5 # How many pods to run
   selector:
     matchLabels:
       app: kubernetes
-  replicas: 5 # How many pods to run
   template:
     metadata:
-      name: kubernetes
       labels:
-        name: kubernetes
         app: kubernetes
     spec:
       containers:
         - name: kubernetes
           image: 202106601/kubernetes
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 40 # Wait for app to start
-            periodSeconds: 15 # Check every 10 seconds
-            timeoutSeconds: 5 # Wait for 5 seconds for response
-            failureThreshold: 3 # If 3 failures, restart the pod
-          
-          readinessProbe: 
-            httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 30 # Wait for app to start
-            periodSeconds: 10  
-            failureThreshold: 3 # If 3 failures, pod is not ready
+          imagePullPolicy: Never
           env:
             - name: Web_Port
               value: "8000"
@@ -41,6 +25,36 @@ spec: # Describes the desired state of the deployment
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
+            - name: Pod_Id
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: SERVICE_DNS
+              value: "bully-service"
+              
+          startupProbe: 
+            httpGet:
+              path: /health
+              port: 8000
+            failureThreshold: 30
+            periodSeconds: 5
+          
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          
+          readinessProbe: 
+            httpGet: 
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
           ports:
             - containerPort: 8000
               name: http
