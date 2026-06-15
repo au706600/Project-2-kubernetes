@@ -137,10 +137,10 @@ As a result, the application inside the pods repeatedly crashed, leading to a Cr
 Furthermore, an additional issue was identified, where two event loops were running concurrently, which also contributed to the pods entering in a CrashLoopBackOff state.
 
 - However we could test to see, if a pod can be connected to the port 8000 with our html website in a kubernetes cluster, which we have set manually. The command to forward a pod name to select a matching port
-to forward to is port-forwarding, which forwards from ip-address that the kubernetes-cluster is running to the port, we have set manually:
+to forward to is port-forwarding, which forwards from ip-address that the kubernetes-cluster is running to the port, for example:
 
 ```
-kubectl port-forward pod/<pod-name> 8000:8000
+kubectl port-forward pod/<pod-name> 8080:8000
 ```
 
 The names of the pods are shown, when running the command as stated above: 
