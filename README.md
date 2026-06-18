@@ -104,6 +104,31 @@ kubectl apply -f Deployment.yml
 kubectl apply -f Services.yml
 ```
 
+4. **After modifying code**
+Rebuild the docker image:
+
+```
+docker build -t <name of dockerimage>
+```
+
+Restart the pods: 
+
+```
+kubectl rollout restart statefulset <name of StatefulSet>
+```
+if the type of kubernetes resource is StatefulSet in the configuration file, otherwise
+
+```
+kubectl rollout restart deployment <name of deployment>
+```
+
+5. **Check that the pods are in READY state**
+
+Check that the pods are running and ready:
+
+```
+kubectl get pods
+```
 
 ## 🧱 Directory Structure
 
